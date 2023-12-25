@@ -1,10 +1,10 @@
-﻿#include <chrono>
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <random>
 #include <vector>
 #include <omp.h>
-#include <stdexcept>
+#include <stdexcept> 
 #include <thread>
 #include <omp.h>
 #include <algorithm>
@@ -150,15 +150,15 @@ public:
         return col_pointers;
     }
 
-    T* GetColumn(int col) {
-        T* values = new T[rows]();
-
+    std::pair<T*, int> GetColumn(int col) {
+        T* values = new T[rows]();       
         Node* current = nodesBegin[col];
         while (current) {
             values[current->row] = current->value;
             current = current->next;
+            
         }
-        return values;
+        return std::make_pair(values, col_noe[col]);
     }
 
 
@@ -182,10 +182,6 @@ public:
     }
 };
 
-/// <summary>
-///
-/// </summary>
-/// <typeparam name="T"></typeparam>
 
 template <typename T>
 class CSR_Format {
@@ -416,7 +412,7 @@ public:
             return;
         }
         csc->addElementForward(row, col, value);
-        if(!m)
+        if (!m)
             csr->addElementForward(row, col, value);
     }
 
@@ -441,15 +437,13 @@ public:
 
 
         SparseMatrix<T>* result = new SparseMatrix<T>(row, col);
-#pragma omp parallel for
+#pragma omp parallel for 
         for (int j = 0; j < col; ++j)
         {
-            if (matrixB.csc->getColPointers()[j] == matrixB.csc->getColPointers()[j + 1]) {
-                // Preskoci ako je kolona prazna
-                continue;
-            }
-
-            T* colB = matrixB.csc->GetColumn(j);
+            // Izvuci cijelu kolonu iz matrice B
+            const auto& pair = matrixB.csc->GetColumn(j);
+            const auto& colB = pair.first;
+            if (pair.second == 0) continue;
             //auto startParallelForward = std::chrono::high_resolution_clock::now();
 #pragma omp parallel for
             for (int i = 0; i < rows; ++i) {
@@ -507,9 +501,10 @@ public:
         for (int j = 0; j < col; ++j)
         {
             // Izvuci cijelu kolonu iz matrice B
-            T* colB = matrixB.csc->GetColumn(j);
+            const auto& pair = matrixB.csc->GetColumn(j);
+            const auto& colB = pair.first;            
+            if (pair.second == 0) continue;
             for (int i = 0; i < rows; ++i) {
-
                 T dotProduct = 0;
 
                 // Racunaj skalarni produkt retka iz prve matrice i kolone iz druge matrice
@@ -648,13 +643,13 @@ int main() {
     }
 
     // Ispis rezultata
-    std::cout << "---------------------------------------------------------"<< std::endl;
+    std::cout << "---------------------------------------------------------" << std::endl;
     std::cout << " Rows | Seq. Forward | Par. Forward | El. in rows | nnz" << std::endl;
     std::cout << "---------------------------------------------------------" << std::endl;
 
     for (size_t i = 0; i < sizesVector.size(); ++i) {
         std::cout << sizesVector[i] << "   | "
-                  << sequentialForwardTimes[i] << " s       | " << parallelForwardTimes[i] << " s       | " << elementsRow[i] << " | " << nnz[i] << std::endl;
+            << sequentialForwardTimes[i] << " s       | " << parallelForwardTimes[i] << " s       | " << elementsRow[i] << " | " << nnz[i] << std::endl;
     }
 
     std::cout << "--------------------------------------------------------" << std::endl;
