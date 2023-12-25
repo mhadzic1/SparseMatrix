@@ -4,7 +4,7 @@
 #include <random>
 #include <vector>
 #include <omp.h>
-#include <stdexcept> 
+#include <stdexcept>
 #include <thread>
 #include <omp.h>
 #include <algorithm>
@@ -151,12 +151,12 @@ public:
     }
 
     T* GetColumn(int col) {
-        T* values = new T[rows]();               
+        T* values = new T[rows]();
 
         Node* current = nodesBegin[col];
         while (current) {
-           values[current->row] = current->value;               
-           current = current->next;
+            values[current->row] = current->value;
+            current = current->next;
         }
         return values;
     }
@@ -326,11 +326,11 @@ public:
         }
         return row_pointers;
     }
-    
+
     T* GetMatrix() {
         T* m = new T[rows * cols]();
 
-        #pragma omp parallel for
+#pragma omp parallel for
         for (int i = 0; i < rows; i++) {
             Node* current = nodesBegin[i];
             while (current) {
@@ -387,7 +387,7 @@ template <typename T> class SparseMatrix {
 private:
     int rows;
     int cols;
-    CSR_Format<T>* csr;    
+    CSR_Format<T>* csr;
     CSC_Format<T>* csc;
 
 public:
@@ -438,13 +438,18 @@ public:
         const auto& A = csr->GetAllElementsWithColumns();
         const auto& valuesA = A.first;
         const auto& colsA = A.second;
-        
+
 
         SparseMatrix<T>* result = new SparseMatrix<T>(row, col);
-#pragma omp parallel for 
+#pragma omp parallel for
         for (int j = 0; j < col; ++j)
-         {
-            T* colB = matrixB.csc->GetColumn(j); 
+        {
+            if (matrixB.csc->getColPointers()[j] == matrixB.csc->getColPointers()[j + 1]) {
+                // Preskoci ako je kolona prazna
+                continue;
+            }
+
+            T* colB = matrixB.csc->GetColumn(j);
             //auto startParallelForward = std::chrono::high_resolution_clock::now();
 #pragma omp parallel for
             for (int i = 0; i < rows; ++i) {
@@ -452,7 +457,7 @@ public:
                 T dotProduct = 0;
                 // Racunaj skalarni produkt retka iz prve matrice i kolone iz druge matrice
                 const int& nextRow = rpA[i + 1];
-                
+
 #pragma omp simd reduction(+:dotProduct)
                 for (int k = rpA[i]; k < nextRow; ++k) {
                     const auto& valueB = colB[colsA[k]];
@@ -468,7 +473,7 @@ public:
                 }
 
             }
-            
+
             //auto endParallelForward = std::chrono::high_resolution_clock::now();
             //double parallelForwardTime = std::chrono::duration<double>(endParallelForward - startParallelForward).count();
             //std::cout << "Vrijeme za mnozenje jedne kolone sa svakim redom: " << parallelForwardTime << std::endl;
@@ -480,7 +485,7 @@ public:
 
 
 
-    
+
 
     SparseMatrix<T>* mult(const SparseMatrix<T>& matrixB) const {
         if (cols != matrixB.rows) {
@@ -495,7 +500,7 @@ public:
         const auto& A = csr->GetAllElementsWithColumns();
         const auto& valuesA = A.first;
         const auto& colsA = A.second;
-        
+
 
         SparseMatrix<T>* result = new SparseMatrix<T>(row, col);
 
@@ -509,7 +514,7 @@ public:
 
                 // Racunaj skalarni produkt retka iz prve matrice i kolone iz druge matrice
                 const int& nextRow = rpA[i + 1];
-                
+
                 for (int k = rpA[i]; k < nextRow; ++k) {
                     const auto& valueB = colB[colsA[k]];
                     if (valueB != 0)
@@ -649,7 +654,7 @@ int main() {
 
     for (size_t i = 0; i < sizesVector.size(); ++i) {
         std::cout << sizesVector[i] << "   | "
-            << sequentialForwardTimes[i] << " s       | " << parallelForwardTimes[i] << " s       | " << elementsRow[i] << " | " << nnz[i] << std::endl;
+                  << sequentialForwardTimes[i] << " s       | " << parallelForwardTimes[i] << " s       | " << elementsRow[i] << " | " << nnz[i] << std::endl;
     }
 
     std::cout << "--------------------------------------------------------" << std::endl;
