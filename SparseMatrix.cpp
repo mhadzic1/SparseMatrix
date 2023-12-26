@@ -8,7 +8,7 @@
 #include <thread>
 #include <omp.h>
 #include <algorithm>
-#include <vector>
+#include <numeric>
 
 template <typename T>
 class CSC_Format {
@@ -231,6 +231,7 @@ public:
 
     void addElement(int row, int col, T value) {
         Node* newNode = new Node(col, value, nullptr);
+        // istrazi da se koristi placement new
 
         if (!nodesBegin[row]) {
             // If the first node in the row does not exist, add the new node
@@ -543,7 +544,6 @@ public:
                 std::cout << a << " ";
             }
             std::cout << std::endl;
-
         }
     }
 
@@ -571,21 +571,28 @@ void dodajElementeURedove(SparseMatrix<T>& matrica, int n) {
 }
 
 template <typename T>
-void dodajElementeURedove2(SparseMatrix<T>& matrica, int n) {
+void dodajElementeURedove2(SparseMatrix<T>&matrica, double percentage) {
     int rows = matrica.getRows();
     int cols = matrica.getCols();
-    for (int i = 0; i < matrica.getRows(); ++i) {
-        for (int j = 0; j < n; ++j) {
-            int randomCol = rand() % cols;
-            matrica.addElement(i, randomCol, 1);
+    int totalElements = static_cast<int>(rows * cols * percentage / 100.0);
+
+    for (int i = 0; i < rows; ++i) {
+
+        std::vector<int> indices(cols);
+        std::iota(indices.begin(), indices.end(), 0);
+
+        std::random_shuffle(indices.begin(), indices.end());
+
+        int elementsToExtract = totalElements / rows;
+        std::vector<int> extractedIndices(indices.begin(), indices.begin() + elementsToExtract);        
+        for (int j = 0; j < totalElements / rows; ++j) {
+            matrica.addElement(i, indices[i], 1);
         }
     }
 }
 
 
 int main() {
-
-
 
     SparseMatrix<int> matrix2(3, 3);
     matrix2.addElementForward(0, 0, 1);
@@ -604,29 +611,29 @@ int main() {
 
     delete rr;
 
-    int startSize = 1000;
+    int startSize = 100;
     int endSize = 10000;
     std::vector<int> sizesVector;
     std::vector<double> sequentialForwardTimes;
     std::vector<double> parallelForwardTimes;
     std::vector<int> elementsRow;
     std::vector<int> nnz;
-    for (int n = 10; n <= 1000; n *= 10) {
+    for (int n = 1; n <= 4; n+=3) {
         for (int size = startSize; size <= endSize; size *= 10) {
             sizesVector.push_back(size);
             elementsRow.push_back(n);
             // Generirajte matrice za trenutnu veličinu
             SparseMatrix<int> m1(size, size);
-            dodajElementeURedove(m1, n);
+            dodajElementeURedove2(m1, n);
             nnz.push_back(m1.getNNZ());
 
 
             // Mjerenje vremena za sekvencijalno množenje unaprijed
             auto startSequentialForward = std::chrono::high_resolution_clock::now();
-            //auto sequentialForwardResult = m1.mult(m1);
+            auto sequentialForwardResult = m1.mult(m1);
             auto endSequentialForward = std::chrono::high_resolution_clock::now();
             double sequentialForwardTime = std::chrono::duration<double>(endSequentialForward - startSequentialForward).count();
-            //delete sequentialForwardResult;
+            delete sequentialForwardResult;
 
             // Mjerenje vremena za paralelno množenje unaprijed
             auto startParallelForward = std::chrono::high_resolution_clock::now();
@@ -644,12 +651,12 @@ int main() {
 
     // Ispis rezultata
     std::cout << "---------------------------------------------------------" << std::endl;
-    std::cout << " Rows | Seq. Forward | Par. Forward | El. in rows | nnz" << std::endl;
+    std::cout << " Rows | Seq. Forward | Par. Forward | Procent of nnz | nnz" << std::endl;
     std::cout << "---------------------------------------------------------" << std::endl;
 
     for (size_t i = 0; i < sizesVector.size(); ++i) {
         std::cout << sizesVector[i] << "   | "
-            << sequentialForwardTimes[i] << " s       | " << parallelForwardTimes[i] << " s       | " << elementsRow[i] << " | " << nnz[i] << std::endl;
+            << sequentialForwardTimes[i] << " s       | " << parallelForwardTimes[i] << " s       | " << elementsRow[i] << "% | " << nnz[i] << std::endl;
     }
 
     std::cout << "--------------------------------------------------------" << std::endl;
