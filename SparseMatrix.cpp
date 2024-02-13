@@ -151,12 +151,12 @@ public:
     }
 
     std::pair<T*, int> GetColumn(int col) {
-        T* values = new T[rows]();       
+        T* values = new T[rows]();
         Node* current = nodesBegin[col];
         while (current) {
             values[current->row] = current->value;
             current = current->next;
-            
+
         }
         return std::make_pair(values, col_noe[col]);
     }
@@ -503,7 +503,7 @@ public:
         {
             // Izvuci cijelu kolonu iz matrice B
             const auto& pair = matrixB.csc->GetColumn(j);
-            const auto& colB = pair.first;            
+            const auto& colB = pair.first;
             if (pair.second == 0) continue;
             for (int i = 0; i < rows; ++i) {
                 T dotProduct = 0;
@@ -571,7 +571,7 @@ void dodajElementeURedove(SparseMatrix<T>& matrica, int n) {
 }
 
 template <typename T>
-void dodajElementeURedove2(SparseMatrix<T>&matrica, double percentage) {
+void dodajElementeURedove2(SparseMatrix<T>& matrica, double percentage) {
     int rows = matrica.getRows();
     int cols = matrica.getCols();
     int totalElements = static_cast<int>(rows * cols * percentage / 100.0);
@@ -584,7 +584,7 @@ void dodajElementeURedove2(SparseMatrix<T>&matrica, double percentage) {
         std::random_shuffle(indices.begin(), indices.end());
 
         int elementsToExtract = totalElements / rows;
-        std::vector<int> extractedIndices(indices.begin(), indices.begin() + elementsToExtract);        
+        std::vector<int> extractedIndices(indices.begin(), indices.begin() + elementsToExtract);
         for (int j = 0; j < totalElements / rows; ++j) {
             matrica.addElement(i, indices[i], 1);
         }
@@ -593,70 +593,51 @@ void dodajElementeURedove2(SparseMatrix<T>&matrica, double percentage) {
 
 
 int main() {
-
-    SparseMatrix<int> matrix2(3, 3);
-    matrix2.addElementForward(0, 0, 1);
-    matrix2.addElementForward(0, 1, 2);
-    matrix2.addElementForward(0, 2, 3);
-    matrix2.addElementForward(1, 0, 4);
-    matrix2.addElementForward(1, 1, 5);
-    matrix2.addElementForward(1, 2, 6);
-    matrix2.addElementForward(2, 0, 7);
-    matrix2.addElementForward(2, 1, 8);
-    matrix2.addElementForward(2, 2, 9);
-
-    auto rr = matrix2.multParallel(matrix2);
-
-    rr->print();
-
-    delete rr;
-
-    int startSize = 100;
+    int startSize = 10000;
     int endSize = 10000;
     std::vector<int> sizesVector;
     std::vector<double> sequentialForwardTimes;
     std::vector<double> parallelForwardTimes;
     std::vector<int> elementsRow;
-    std::vector<int> nnz;
-    for (int n = 1; n <= 4; n+=3) {
+    for (int n = 1; n <= 20; n += 5) {
+        if (n == 6) n = 5;
         for (int size = startSize; size <= endSize; size *= 10) {
             sizesVector.push_back(size);
             elementsRow.push_back(n);
-            // Generirajte matrice za trenutnu veličinu
             SparseMatrix<int> m1(size, size);
             dodajElementeURedove2(m1, n);
-            nnz.push_back(m1.getNNZ());
-
-
-            // Mjerenje vremena za sekvencijalno množenje unaprijed
+            
             auto startSequentialForward = std::chrono::high_resolution_clock::now();
-            auto sequentialForwardResult = m1.mult(m1);
+            //auto sequentialForwardResult = m1.mult(m1);
             auto endSequentialForward = std::chrono::high_resolution_clock::now();
             double sequentialForwardTime = std::chrono::duration<double>(endSequentialForward - startSequentialForward).count();
-            delete sequentialForwardResult;
+            //delete sequentialForwardResult;
 
-            // Mjerenje vremena za paralelno množenje unaprijed
-            auto startParallelForward = std::chrono::high_resolution_clock::now();
-            auto parallelForwardResult = m1.multParallel(m1);
-            auto endParallelForward = std::chrono::high_resolution_clock::now();
-            double parallelForwardTime = std::chrono::duration<double>(endParallelForward - startParallelForward).count();
-            delete parallelForwardResult;
+            int repeat = 10;
+            double average = 0;
+            for (int k = 0; k < repeat; k++) {
+                auto startParallelForward = std::chrono::high_resolution_clock::now();
+                auto parallelForwardResult = m1.multParallel(m1);
+                auto endParallelForward = std::chrono::high_resolution_clock::now();
+                double parallelForwardTime = std::chrono::duration<double>(endParallelForward - startParallelForward).count();
+                average += parallelForwardTime;
+                delete parallelForwardResult;
+            }
 
-            // Zabilježite rezultate u vektore
             sequentialForwardTimes.push_back(sequentialForwardTime);
-            parallelForwardTimes.push_back(parallelForwardTime);
+            parallelForwardTimes.push_back(average / repeat);
         }
         std::cout << "Gotovo mnozenje za n = " << n << std::endl;
     }
 
     // Ispis rezultata
-    std::cout << "---------------------------------------------------------" << std::endl;
-    std::cout << " Rows | Seq. Forward | Par. Forward | Procent of nnz | nnz" << std::endl;
-    std::cout << "---------------------------------------------------------" << std::endl;
+    std::cout << "-----------------------------------------------------" << std::endl;
+    std::cout << " Rows | Seq. Forward | Par. Forward | Procent of nnz " << std::endl;
+    std::cout << "-----------------------------------------------------" << std::endl;
 
     for (size_t i = 0; i < sizesVector.size(); ++i) {
         std::cout << sizesVector[i] << "   | "
-            << sequentialForwardTimes[i] << " s       | " << parallelForwardTimes[i] << " s       | " << elementsRow[i] << "% | " << nnz[i] << std::endl;
+            << sequentialForwardTimes[i] << " s       | " << parallelForwardTimes[i] << " s       | " << elementsRow[i] << "% | " << std::endl;
     }
 
     std::cout << "--------------------------------------------------------" << std::endl;
